@@ -28,14 +28,11 @@ class GameLogic {
         };
       })
     };
-    this.onDisconnectInit = () => {
-      this.gameState.players = this.gameState.players.filter(
-        player => player.socketID !== socket.id
-      );
-    };
   }
 
   addSocket(socket) {
+    console.log(this.sockets.length);
+    console.log("添加socket");
     this.sockets.push(socket);
   }
   canStart() {
@@ -114,29 +111,46 @@ class GameLogic {
     }
   }
 
+  removeSocket(socket) {
+    this.sockets = this.sockets.filter(s => s.id !== socket.id);
+  }
+  removePlayer(socket) {
+    this.gameState.players = this.gameState.players.filter(
+      player => player.socketID !== socket.id
+    );
+  }
+  removeChoice(socket) {
+    this.gameState.choices = this.gameState.choices.filter(choice => {
+      return choice.socketID !== socket.id;
+    });
+  }
+
+  handleDisconnect(socket) {
+    console.log("处理断开连接");
+    this.removeSocket(socket);
+    this.removePlayer(socket);
+    this.removeChoice(socket);
+  }
+
   async waitForChoices() {
     const gameState = this.gameState;
     console.log("Waiting for choices");
-    return new Promise(resolve => {
-      for (const socket of this.sockets) {
-        const onDisconnect = () => {
-          this.gameState.choices = this.gameState.choices.filter(
-            choice => choice.socketID !== socket.id
-          );
-          if (
-            this.gameState.choices.length ===
-            this.gameState.players.filter(player => player.status === "alive")
-              .length
-          ) {
-            resolve();
-            for (const socket of this.sockets) {
-              socket.removeAllListeners("choice");
-              socket.off("disconnect", onDisconnect);
-            }
-          }
-        };
 
-        socket.on("disconnect", onDisconnect);
+    return new Promise(resolve => {
+      const timer = setTimeout(() => {
+        console.log("等待超时");
+        const alivers = gameState.players.filter(
+          player => player.status === "alive"
+        );
+        this.gameState.choices = alivers.map(player => {
+          if (!choices.some(choice => choice.socketID === player.socketID)) {
+            return { choice: "leave", socketID: player.socketID };
+          }
+        });
+        resolve();
+      }, 30000);
+
+      for (const socket of this.sockets) {
         const onChoice = choice => {
           console.log(socket.id + "选择了" + choice);
           gameState.choices.push({ choice, socketID: socket.id });
@@ -144,10 +158,10 @@ class GameLogic {
             gameState.choices.length ===
             gameState.players.filter(player => player.status === "alive").length
           ) {
+            clearTimeout(timer);
             resolve();
             for (const socket of this.sockets) {
               socket.removeAllListeners("choice");
-              socket.off("disconnect", onDisconnect);
             }
           }
         };
@@ -200,13 +214,12 @@ class GameLogic {
   }
 
   async waitForNewRoundStart() {
-    const room = this.room;
     console.log("Waiting for new round start");
     return new Promise(resolve => {
       let readyPlayers = 0;
       const onNewRoundStart = () => {
         readyPlayers++;
-        if (readyPlayers === room.players.length) {
+        if (readyPlayers === this.sockets.length) {
           console.log("所有玩家准备好了");
           resolve();
 
@@ -260,13 +273,11 @@ class GameLogic {
         console.log("socketID:" + socket.id, "getGameState");
         cb(gameState);
       });
-      socket.on("disconnect", this.onDisconnectInit);
     }
   }
   cleanUpIo() {
     for (const socket of this.sockets) {
       socket.removeAllListeners("getGameState");
-      socket.off("disconnect", this.onDisconnectInit);
     }
   }
 }

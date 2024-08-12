@@ -66,10 +66,16 @@ function onDisconnect(socket) {
         player => player.socketID !== socket.id
       ); // 离开房间
       if (room.persons === 0) {
-        rooms = rooms.filter(room => room.name !== player.inviteCode);
-      } // 如果房间人数为0，删除房间
-      console.log("玩家" + player.name + "退出了房间" + room.name);
+        rooms.splice(rooms.indexOf(room), 1);
+        if (gameLogics[room.name]) {
+          delete gameLogics[room.name];
+        } // 如果房间人数为0，删除房间
+        console.log("玩家" + player.name + "退出了房间" + room.name);
+      }
       io.emit("updateRooms", rooms);
+      if (gameLogics[room.name]) {
+        gameLogics[room.name].handleDisconnect(socket);
+      }
     }
     socket.removeAllListeners();
     console.log("用户断开连接");
@@ -94,7 +100,9 @@ io.on("connection", socket => {
   onDisconnect(socket);
   onStartGame(socket);
   RoomsLogic(io, socket, rooms, players);
+
   socket.on("GameStart!", () => {
+    console.log("Get GameStart!");
     const player = players.find(player => player.socketID === socket.id);
     const room = rooms.find(room => room.name === player.inviteCode);
     console.log("player: " + player.name + " start game in room " + room.name);
@@ -123,6 +131,7 @@ io.on("connection", socket => {
     if (room) {
       if (gameLogics[room.name]) {
         delete gameLogics[room.name];
+        console.log(gameLogics);
       }
       rooms.splice(rooms.indexOf(room), 1);
     }

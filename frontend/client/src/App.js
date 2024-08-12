@@ -30,6 +30,15 @@ function App() {
     };
   }, []);
 
+  useEffect(
+    () => {
+      if (playGame) {
+        socket.emit("GameStart!");
+      }
+    },
+    [playGame]
+  );
+
   // 进入游戏界面，在后端登记玩家姓名
   const handleStartGame = name => {
     setStarted(true);

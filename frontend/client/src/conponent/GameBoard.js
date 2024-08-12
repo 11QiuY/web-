@@ -41,7 +41,6 @@ function GameBoard() {
   const [gameLevel, setGameLevel] = useState(0);
 
   useEffect(() => {
-    socket.emit("GameStart!");
     socket.on("updateGameLevel", gameState => {
       setGameLevel(gameState);
     });
